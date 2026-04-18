@@ -1,0 +1,17 @@
+body { 
+    margin: 0; height: 100vh; overflow: hidden;
+    background: linear-gradient(135deg, #0f172a, #334155);
+    font-family: -apple-system, system-ui, sans-serif;
+}
+#desktop { padding: 40px; display: flex; gap: 30px; }
+.app-icon { width: 80px; text-align: center; color: white; cursor: pointer; }
+.icon-box { 
+    width: 65px; height: 65px; background: white; border-radius: 16px; 
+    margin: 0 auto 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+#taskbar {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.2); backdrop-filter: blur(20px);
+    padding: 12px 24px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.3);
+}
+.btn { color: white; font-weight: 600; cursor: pointer; }
