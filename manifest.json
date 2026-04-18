@@ -1,0 +1,13 @@
+{
+  "name": "isaahi-os 1.0.0",
+  "short_name": "isaahi",
+  "display": "standalone",
+  "start_url": "index.html",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [{
+    "src": "https://cdn-icons-png.flaticon.com/512/2583/2583344.png",
+    "sizes": "512x512",
+    "type": "image/png"
+  }]
+}
