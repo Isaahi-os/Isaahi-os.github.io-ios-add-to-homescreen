@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>isaahi-os</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+    <div id="desktop"></div>
+    <div id="taskbar">
+        <label class="btn">Install .iapp <input type="file" id="installer" hidden accept="*/*"></label>
+    </div>
+
+    <script src="kernel.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+
+        // Kernel Boot Sequence
+        Module.onRuntimeInitialized = () => {
+            Module._boot_kernel();
+            console.log("OS Kernel Initialized");
+        };
+
+        const installer = document.getElementById('installer');
+        installer.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const zip = await JSZip.loadAsync(file);
+            const icon = document.createElement('div');
+            icon.className = 'app-icon';
+            icon.innerHTML = `<div class="icon-box"></div><span>${file.name}</span>`;
+            document.getElementById('desktop').appendChild(icon);
+        };
+    </script>
+</body>
+</html>
