@@ -1,0 +1,20 @@
+name: OS-Build
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Emscripten
+        run: |
+          sudo apt-get update
+          sudo apt-get install emscripten -y
+      - name: Build Kernel
+        run: |
+          emcc kernel.cpp -o kernel.js -s WASM=1 \
+          -s EXPORTED_FUNCTIONS='["_boot_kernel", "_get_version", "_read_sys_file"]' \
+          -s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]'
+      - name: Deploy
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: .
