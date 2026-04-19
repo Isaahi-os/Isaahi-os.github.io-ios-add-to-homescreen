@@ -21,18 +21,26 @@ public:
 
     void write_file(std::string path, std::string content) {
         vfs[path] = content;
+        std::cout << "[VFS] File Saved: " << path << " (" << content.length() << " bytes)" << std::endl;
     }
 };
 
 Kernel os;
 
 extern "C" {
+    // Standard Boot
     EMSCRIPTEN_KEEPALIVE
     void boot_kernel() { os.boot(); }
 
+    // Read from VFS
     EMSCRIPTEN_KEEPALIVE
-    const char* get_version() { return "1.0.0"; }
+    const char* read_sys_file(const char* path) { 
+        return os.read_file(path); 
+    }
 
+    // NEW: Write to VFS from JavaScript
     EMSCRIPTEN_KEEPALIVE
-    const char* read_sys_file(const char* path) { return os.read_file(path); }
+    void write_sys_file(const char* path, const char* content) {
+        os.write_file(path, content);
+    }
 }
