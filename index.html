@@ -5,125 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>isaahi-os</title>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #121212; font-family: sans-serif; }
+        #desktop { width: 100%; height: calc(100% - 60px); display: flex; flex-wrap: wrap; gap: 30px; padding: 30px; }
+        #taskbar { width: 100%; height: 60px; background: #222; display: flex; align-items: center; padding: 0 20px; position: fixed; bottom: 0; border-top: 1px solid #333; }
+        .btn { background: white; color: black; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
         
-        #desktop { 
-            width: 100%; height: calc(100% - 60px); 
-            display: flex; flex-wrap: wrap; align-content: flex-start; 
-            gap: 30px; padding: 30px; 
-        }
+        /* White Box Icons */
+        .app-icon { width: 80px; text-align: center; color: white; cursor: pointer; }
+        .icon-box { width: 60px; height: 60px; background: white; border-radius: 14px; margin: 0 auto 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .app-name { font-size: 12px; display: block; }
 
-        #taskbar { 
-            width: 100%; height: 60px; background: rgba(30, 30, 30, 0.9); 
-            display: flex; align-items: center; padding: 0 20px; 
-            position: fixed; bottom: 0; border-top: 1px solid #333; backdrop-filter: blur(10px);
-        }
-
-        .btn { background: #ffffff; color: #000; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
-        .btn:hover { background: #dddddd; }
-
-        /* The "Blank White Box" Icon Style */
-        .app-icon { width: 70px; text-align: center; color: white; cursor: pointer; transition: transform 0.2s; }
-        .app-icon:hover { transform: scale(1.05); }
-        .icon-box { 
-            width: 60px; height: 60px; 
-            background: white; /* Pure white box */
-            border-radius: 14px; 
-            margin: 0 auto 10px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-        }
-        .app-name { font-size: 12px; font-weight: 500; display: block; opacity: 0.9; }
-
-        /* App Window */
-        .window { position: absolute; background: white; border: 1px solid #000; z-index: 100; border-radius: 10px 10px 0 0; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-        .window-header { background: #f1f1f1; padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
-        .close-btn { background: #ff5f56; border: none; width: 12px; height: 12px; border-radius: 50%; cursor: pointer; }
-        iframe { width: 100%; height: calc(100% - 40px); border: none; }
-        
-        #status { position: fixed; bottom: 70px; left: 20px; color: #555; font-size: 10px; }
+        /* Window UI */
+        .window { position: absolute; background: white; border: 1px solid #000; z-index: 100; border-radius: 10px 10px 0 0; overflow: hidden; width: 80%; height: 70%; top: 10%; left: 10%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .window-header { background: #f0f0f0; padding: 10px; display: flex; justify-content: space-between; border-bottom: 1px solid #ccc; font-weight: bold; color: #333; }
+        .close-btn { background: #ff5f56; border: none; width: 15px; height: 15px; border-radius: 50%; cursor: pointer; }
+        iframe { width: 100%; height: calc(100% - 40px); border: none; background: white; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
     <div id="desktop"></div>
-    <div id="status">Kernel: Connecting...</div>
 
     <div id="taskbar">
-        <label class="btn">
-            Install .iapp 
-            <input type="file" id="installer" hidden accept=".iapp,*/*">
-        </label>
+        <label class="btn">Install .iapp <input type="file" id="installer" hidden accept=".iapp,*/*"></label>
     </div>
 
     <script src="kernel.js"></script>
     <script>
-        const statusEl = document.getElementById('status');
-
-        Module.onRuntimeInitialized = () => {
-            if (Module._boot_kernel) {
-                Module._boot_kernel();
-                statusEl.innerText = "Kernel: Online";
-                statusEl.style.color = "#0f0";
-            }
-        };
-
-        const installer = document.getElementById('installer');
-
-        installer.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            // Strip the .iapp extension for the display name
-            const appName = file.name.replace(/\.iapp$/i, '');
-
-            try {
-                const zip = await JSZip.loadAsync(file);
-                
-                for (const [path, entry] of Object.entries(zip.files)) {
-                    if (!entry.dir) {
-                        const content = await entry.async("string");
-                        // Send data to C++ Virtual File System
-                        Module.ccall('write_sys_file', null, ['string', 'string'], [`/apps/${appName}/${path}`, content]);
-                    }
-                }
-
-                createIcon(appName);
-            } catch (err) {
-                console.error("Installation error:", err);
-                alert("Failed to read .iapp file.");
-            }
+        // Run when kernel is ready
+        window.onKernelLoad = () => {
+            createIcon("Isaahi-browser");
+            createIcon("my_app");
         };
 
         function createIcon(name) {
+            const cleanName = name.replace(/\.iapp$/i, '');
+            if (document.getElementById('icon-' + cleanName)) return;
+
             const icon = document.createElement('div');
+            icon.id = 'icon-' + cleanName;
             icon.className = 'app-icon';
-            icon.onclick = () => launchApp(name);
-            
-            icon.innerHTML = `
-                <div class="icon-box"></div>
-                <span class="app-name">${name}</span>
-            `;
-            
+            icon.onclick = () => launchApp(cleanName);
+            icon.innerHTML = `<div class="icon-box"></div><span class="app-name">${cleanName}</span>`;
             document.getElementById('desktop').appendChild(icon);
         }
 
         function launchApp(appName) {
-            const html = Module.ccall('read_sys_file', 'string', ['string'], [`/apps/${appName}/index.html`]);
-            const css = Module.ccall('read_sys_file', 'string', ['string'], [`/apps/${appName}/style.css`]);
+            const html = Module.ccall('read_sys_file', 'string', null, [`/apps/${appName}/index.html`]);
+            const css = Module.ccall('read_sys_file', 'string', null, [`/apps/${appName}/style.css`]);
 
-            if (html === "ERR_404") {
-                alert(`Error: index.html not found for ${appName}`);
-                return;
-            }
+            if (html === "ERR_404") return alert("Launch Error: Files missing.");
 
             const win = document.createElement('div');
             win.className = 'window';
-            win.style.top = '10%'; win.style.left = '10%'; win.style.width = '80%'; win.style.height = '70%';
-            
             win.innerHTML = `
                 <div class="window-header">
-                    <span style="font-size: 13px; font-weight: bold; color: #333;">${appName}</span>
+                    <span>${appName}</span>
                     <button class="close-btn" onclick="this.closest('.window').remove()"></button>
                 </div>
                 <iframe id="f-${appName}"></iframe>
@@ -135,6 +73,21 @@
             doc.write(`${html}<style>${css}</style>`);
             doc.close();
         }
+
+        // Keep manual installer for future files
+        document.getElementById('installer').onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const zip = await JSZip.loadAsync(file);
+            const appName = file.name.replace(/\.iapp$/i, '');
+            for (const [path, entry] of Object.entries(zip.files)) {
+                if (!entry.dir) {
+                    const content = await entry.async("string");
+                    Module.ccall('write_sys_file', null, null, [`/apps/${appName}/${path}`, content]);
+                }
+            }
+            createIcon(appName);
+        };
     </script>
 </body>
 </html>
