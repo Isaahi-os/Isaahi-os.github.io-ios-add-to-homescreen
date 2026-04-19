@@ -7,78 +7,108 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>isaahi-os</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; background: #1a1a1a; }
+        #desktop { width: 100%; height: calc(100% - 50px); position: relative; padding: 20px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 20px; }
+        #taskbar { width: 100%; height: 50px; background: #333; display: flex; align-items: center; padding: 0 10px; position: fixed; bottom: 0; }
+        .btn { background: #444; color: white; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        .app-icon { width: 80px; text-align: center; color: white; cursor: pointer; }
+        .icon-box { width: 50px; height: 50px; background: #555; border-radius: 10px; margin: 0 auto 5px; border: 1px solid #777; }
+        .window { position: absolute; background: white; border: 2px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 100; min-width: 300px; min-height: 200px; border-radius: 5px 5px 0 0; }
+        .window-header { background: #333; color: white; padding: 5px 10px; display: flex; justify-content: space-between; cursor: move; border-radius: 3px 3px 0 0; }
+        .close-btn { background: #ff5f56; border: none; border-radius: 50%; width: 15px; height: 15px; cursor: pointer; }
+        iframe { width: 100%; height: calc(100% - 30px); border: none; background: white; }
+    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
     <div id="desktop"></div>
-    
     <div id="taskbar">
-        <label class="btn">
-            Install .iapp 
-            <input type="file" id="installer" hidden accept=".iapp,*/*">
-        </label>
+        <label class="btn">Install .iapp <input type="file" id="installer" hidden accept=".iapp,*/*"></label>
     </div>
 
     <script src="kernel.js"></script>
-    
     <script>
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 
-        // Kernel Boot Sequence
+        // 1. Initialize Kernel
         Module.onRuntimeInitialized = () => {
-            // Check if the exported function exists
-            if(Module._boot_kernel) {
+            if (Module._boot_kernel) {
                 Module._boot_kernel();
                 console.log("OS Kernel Initialized");
             }
         };
 
         const installer = document.getElementById('installer');
-        
+
+        // 2. Handle App Installation (.iapp parsing)
         installer.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            console.log(`Installing: ${file.name}`);
-            
             try {
                 const zip = await JSZip.loadAsync(file);
                 const appName = file.name.replace('.iapp', '');
 
-                // Iterate through files in the ZIP and write to Kernel VFS
-                for (const [relativePath, zipEntry] of Object.entries(zip.files)) {
-                    if (!zipEntry.dir) {
-                        const content = await zipEntry.async("string");
-                        const vfsPath = `/apps/${appName}/${relativePath}`;
+                // Write each file in the .iapp to the C++ VFS 
+                for (const [path, entry] of Object.entries(zip.files)) {
+                    if (!entry.dir) {
+                        const content = await entry.async("string");
+                        const vfsPath = `/apps/${appName}/${path}`;
                         
-                        // Send data to C++ Kernel
-                        Module.ccall(
-                            'write_sys_file', 
-                            null, 
-                            ['string', 'string'], 
-                            [vfsPath, content]
-                        );
+                        Module.ccall('write_sys_file', null, ['string', 'string'], [vfsPath, content]);
                     }
                 }
 
-                // Create UI Icon
                 createIcon(appName);
-                
             } catch (err) {
-                console.error("Installation failed:", err);
+                console.error("Install Error:", err);
             }
         };
 
+        // 3. Create Desktop Icon
         function createIcon(name) {
             const icon = document.createElement('div');
             icon.className = 'app-icon';
-            icon.style.textAlign = "center";
-            icon.innerHTML = `
-                <div style="width:50px; height:50px; background:#444; margin:auto; border-radius:10px;"></div>
-                <span style="color:white; font-size:12px;">${name}</span>
-            `;
+            icon.onclick = () => launchApp(name);
+            icon.innerHTML = `<div class="icon-box"></div><span>${name}</span>`;
             document.getElementById('desktop').appendChild(icon);
+        }
+
+        // 4. Launch App Logic
+        function launchApp(appName) {
+            // Retrieve source from C++ Kernel VFS
+            const html = Module.ccall('read_sys_file', 'string', ['string'], [`/apps/${appName}/index.html`]);
+            const css = Module.ccall('read_sys_file', 'string', ['string'], [`/apps/${appName}/style.css`]);
+
+            if (html === "ERR_404") {
+                alert("Launch failed: index.html not found.");
+                return;
+            }
+
+            // Create Window UI
+            const win = document.createElement('div');
+            win.className = 'window';
+            win.style.top = '100px';
+            win.style.left = '100px';
+            win.style.width = '500px';
+            win.style.height = '400px';
+            
+            win.innerHTML = `
+                <div class="window-header">
+                    <span>${appName}</span>
+                    <button class="close-btn" onclick="this.closest('.window').remove()"></button>
+                </div>
+                <iframe id="iframe-${appName}"></iframe>
+            `;
+            document.body.appendChild(win);
+
+            // Inject app code into iframe
+            const iframe = document.getElementById(`iframe-${appName}`);
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open();
+            doc.write(`${html}<style>${css}</style>`);
+            doc.close();
         }
     </script>
 </body>
