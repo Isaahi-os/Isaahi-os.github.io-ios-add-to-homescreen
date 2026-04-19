@@ -12,31 +12,74 @@
 </head>
 <body>
     <div id="desktop"></div>
+    
     <div id="taskbar">
-        <label class="btn">Install .iapp <input type="file" id="installer" hidden accept="*/*"></label>
+        <label class="btn">
+            Install .iapp 
+            <input type="file" id="installer" hidden accept=".iapp,*/*">
+        </label>
     </div>
 
     <script src="kernel.js"></script>
+    
     <script>
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 
         // Kernel Boot Sequence
         Module.onRuntimeInitialized = () => {
-            Module._boot_kernel();
-            console.log("OS Kernel Initialized");
+            // Check if the exported function exists
+            if(Module._boot_kernel) {
+                Module._boot_kernel();
+                console.log("OS Kernel Initialized");
+            }
         };
 
         const installer = document.getElementById('installer');
+        
         installer.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
+
+            console.log(`Installing: ${file.name}`);
             
-            const zip = await JSZip.loadAsync(file);
+            try {
+                const zip = await JSZip.loadAsync(file);
+                const appName = file.name.replace('.iapp', '');
+
+                // Iterate through files in the ZIP and write to Kernel VFS
+                for (const [relativePath, zipEntry] of Object.entries(zip.files)) {
+                    if (!zipEntry.dir) {
+                        const content = await zipEntry.async("string");
+                        const vfsPath = `/apps/${appName}/${relativePath}`;
+                        
+                        // Send data to C++ Kernel
+                        Module.ccall(
+                            'write_sys_file', 
+                            null, 
+                            ['string', 'string'], 
+                            [vfsPath, content]
+                        );
+                    }
+                }
+
+                // Create UI Icon
+                createIcon(appName);
+                
+            } catch (err) {
+                console.error("Installation failed:", err);
+            }
+        };
+
+        function createIcon(name) {
             const icon = document.createElement('div');
             icon.className = 'app-icon';
-            icon.innerHTML = `<div class="icon-box"></div><span>${file.name}</span>`;
+            icon.style.textAlign = "center";
+            icon.innerHTML = `
+                <div style="width:50px; height:50px; background:#444; margin:auto; border-radius:10px;"></div>
+                <span style="color:white; font-size:12px;">${name}</span>
+            `;
             document.getElementById('desktop').appendChild(icon);
-        };
+        }
     </script>
 </body>
 </html>
