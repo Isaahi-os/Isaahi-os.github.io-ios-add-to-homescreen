@@ -1,0 +1,24 @@
+name: Compile Kernel
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Emscripten
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git
+          cd emsdk
+          ./emsdk install latest
+          ./emsdk activate latest
+      - name: Build
+        run: |
+          source ./emsdk/emsdk_env.sh
+          emcc kernel.cpp -o kernel.js -s EXPORTED_RUNTIME_METHODS='["ccall"]' -s EXPORTED_FUNCTIONS='["_boot_kernel", "_read_sys_file", "_write_sys_file"]'
+      - name: Commit files
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add kernel.js kernel.wasm
+          git commit -m "Auto-compile kernel" || echo "No changes to commit"
+          git push
