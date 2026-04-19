@@ -5,56 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>isaahi-os</title>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; background: #1a1a1a; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; }
         
-        /* Desktop area where icons appear */
         #desktop { 
-            width: 100%; 
-            height: calc(100% - 60px); 
-            display: flex; 
-            flex-wrap: wrap; 
-            align-content: flex-start; 
-            gap: 25px; 
-            padding: 20px; 
+            width: 100%; height: calc(100% - 60px); 
+            display: flex; flex-wrap: wrap; align-content: flex-start; 
+            gap: 30px; padding: 30px; 
         }
 
-        /* Taskbar at the bottom */
         #taskbar { 
-            width: 100%; 
-            height: 60px; 
-            background: #222; 
-            display: flex; 
-            align-items: center; 
-            padding: 0 20px; 
-            position: fixed; 
-            bottom: 0; 
-            border-top: 1px solid #444;
+            width: 100%; height: 60px; background: rgba(30, 30, 30, 0.9); 
+            display: flex; align-items: center; padding: 0 20px; 
+            position: fixed; bottom: 0; border-top: 1px solid #333; backdrop-filter: blur(10px);
         }
 
-        .btn { background: #eee; color: #000; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn { background: #ffffff; color: #000; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .btn:hover { background: #dddddd; }
 
-        /* The App Icon - Blank White Box style */
-        .app-icon { width: 80px; text-align: center; color: white; cursor: pointer; }
+        /* The "Blank White Box" Icon Style */
+        .app-icon { width: 70px; text-align: center; color: white; cursor: pointer; transition: transform 0.2s; }
+        .app-icon:hover { transform: scale(1.05); }
         .icon-box { 
-            width: 60px; 
-            height: 60px; 
-            background: white; /* Blank White Box */
-            border-radius: 12px; 
-            margin: 0 auto 8px; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            width: 60px; height: 60px; 
+            background: white; /* Pure white box */
+            border-radius: 14px; 
+            margin: 0 auto 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
         }
-        .app-name { font-size: 13px; font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .app-name { font-size: 12px; font-weight: 500; display: block; opacity: 0.9; }
 
-        /* Window Styling */
-        .window { position: absolute; background: white; border: 1px solid #000; z-index: 100; border-radius: 8px 8px 0 0; overflow: hidden; }
-        .window-header { background: #eee; padding: 8px; display: flex; justify-content: space-between; border-bottom: 1px solid #ccc; }
-        iframe { width: 100%; height: calc(100% - 35px); border: none; }
+        /* App Window */
+        .window { position: absolute; background: white; border: 1px solid #000; z-index: 100; border-radius: 10px 10px 0 0; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .window-header { background: #f1f1f1; padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
+        .close-btn { background: #ff5f56; border: none; width: 12px; height: 12px; border-radius: 50%; cursor: pointer; }
+        iframe { width: 100%; height: calc(100% - 40px); border: none; }
+        
+        #status { position: fixed; bottom: 70px; left: 20px; color: #555; font-size: 10px; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
     <div id="desktop"></div>
+    <div id="status">Kernel: Connecting...</div>
 
     <div id="taskbar">
         <label class="btn">
@@ -65,11 +58,13 @@
 
     <script src="kernel.js"></script>
     <script>
-        // Check if Kernel loaded
+        const statusEl = document.getElementById('status');
+
         Module.onRuntimeInitialized = () => {
             if (Module._boot_kernel) {
                 Module._boot_kernel();
-                console.log("Kernel Online");
+                statusEl.innerText = "Kernel: Online";
+                statusEl.style.color = "#0f0";
             }
         };
 
@@ -79,23 +74,24 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            // Remove .iapp from the name
-            const appName = file.name.replace('.iapp', '');
+            // Strip the .iapp extension for the display name
+            const appName = file.name.replace(/\.iapp$/i, '');
 
             try {
                 const zip = await JSZip.loadAsync(file);
                 
-                // Save files to Kernel VFS
                 for (const [path, entry] of Object.entries(zip.files)) {
                     if (!entry.dir) {
                         const content = await entry.async("string");
+                        // Send data to C++ Virtual File System
                         Module.ccall('write_sys_file', null, ['string', 'string'], [`/apps/${appName}/${path}`, content]);
                     }
                 }
 
                 createIcon(appName);
             } catch (err) {
-                console.error("Install failed:", err);
+                console.error("Installation error:", err);
+                alert("Failed to read .iapp file.");
             }
         };
 
@@ -116,16 +112,19 @@
             const html = Module.ccall('read_sys_file', 'string', ['string'], [`/apps/${appName}/index.html`]);
             const css = Module.ccall('read_sys_file', 'string', ['string'], [`/apps/${appName}/style.css`]);
 
-            if (html === "ERR_404") return alert("App startup failed.");
+            if (html === "ERR_404") {
+                alert(`Error: index.html not found for ${appName}`);
+                return;
+            }
 
             const win = document.createElement('div');
             win.className = 'window';
-            win.style.top = '50px'; win.style.left = '50px'; win.style.width = '600px'; win.style.height = '400px';
+            win.style.top = '10%'; win.style.left = '10%'; win.style.width = '80%'; win.style.height = '70%';
             
             win.innerHTML = `
                 <div class="window-header">
-                    <span>${appName}</span>
-                    <button onclick="this.closest('.window').remove()">X</button>
+                    <span style="font-size: 13px; font-weight: bold; color: #333;">${appName}</span>
+                    <button class="close-btn" onclick="this.closest('.window').remove()"></button>
                 </div>
                 <iframe id="f-${appName}"></iframe>
             `;
